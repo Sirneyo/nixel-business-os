@@ -1,0 +1,200 @@
+<!--
+  Nixel Business OS — Starter Edition
+  Example: inbound lead-capture form
+
+  This standalone page POSTs a JSON lead to the Nixel inbound webhook:
+
+      POST http://localhost:8000/api/inbound/lead
+      Header: X-API-Key: <your INBOUND_WEBHOOK_KEY>
+      Body:   {company_name, contact_name, email, message, source_detail}
+
+  HOW TO ADAPT IT
+  1. Replace API_URL below with your backend's public URL
+     (it must match PUBLIC_BASE_URL, e.g. https://yourdomain.com/api/inbound/lead).
+  2. Replace API_KEY with the value of INBOUND_WEBHOOK_KEY from backend/.env.
+     The webhook returns 503 until a key is configured, and 403 if it doesn't match.
+  3. Open this file in a browser and submit — the lead appears in your
+     Verified Lead Workspace flagged "inbound", and any active automation with
+     the "inbound lead" trigger enrolls it immediately.
+
+  IMPORTANT — PRODUCTION WARNING
+  Never expose the API key in public client-side code. Anyone can "View Source"
+  on a public web page and read it, then post junk leads (or worse) to your
+  system. This direct-from-browser pattern is for local testing and internal
+  pages only. For a public website, submit the form to YOUR OWN server
+  (a tiny endpoint in PHP/Node/Python/your CMS), and have that server add the
+  X-API-Key header and forward the JSON to Nixel. The key then stays
+  server-side where visitors can never see it.
+-->
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact us — example lead form</title>
+
+<style>
+  :root {
+    --accent: #16a34a;
+    --accent-dark: #128038;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #f4f5f7;
+    color: var(--ink);
+    line-height: 1.5;
+    display: flex;
+    justify-content: center;
+    padding: 48px 16px;
+  }
+  .card {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+    max-width: 460px;
+    width: 100%;
+    padding: 32px;
+  }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  p.lede { margin: 0 0 24px; color: var(--muted); font-size: 15px; }
+  label { display: block; font-size: 14px; font-weight: 600; margin: 16px 0 6px; }
+  label .optional { font-weight: 400; color: var(--muted); }
+  input, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 15px;
+    font-family: inherit;
+    color: inherit;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+  }
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+  }
+  textarea { min-height: 96px; resize: vertical; }
+  button {
+    margin-top: 24px;
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: inherit;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button:hover { background: var(--accent-dark); }
+  button:disabled { opacity: 0.6; cursor: wait; }
+  .status {
+    display: none;
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  .status.success { display: block; background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+  .status.error   { display: block; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+</style>
+
+<div class="card">
+  <h1>Get in touch</h1>
+  <p class="lede">Tell us a little about your business and we'll get back to you within one working day.</p>
+
+  <form id="lead-form" novalidate>
+    <label for="company_name">Company name</label>
+    <input id="company_name" name="company_name" type="text" required
+           placeholder="Acme Ltd" autocomplete="organization">
+
+    <label for="contact_name">Your name <span class="optional">(optional)</span></label>
+    <input id="contact_name" name="contact_name" type="text"
+           placeholder="Jane Doe" autocomplete="name">
+
+    <label for="email">Email address <span class="optional">(optional)</span></label>
+    <input id="email" name="email" type="email"
+           placeholder="jane@acme.com" autocomplete="email">
+
+    <label for="message">How can we help? <span class="optional">(optional)</span></label>
+    <textarea id="message" name="message"
+              placeholder="We're looking for help with…"></textarea>
+
+    <button type="submit" id="submit-btn">Send message</button>
+    <div class="status" id="status" role="status"></div>
+  </form>
+</div>
+
+<script>
+  // ── Configuration — replace both values (see the comment block at the top) ──
+  var API_URL = "http://localhost:8000/api/inbound/lead";
+  var API_KEY = "REPLACE_WITH_YOUR_INBOUND_WEBHOOK_KEY";
+
+  var form = document.getElementById("lead-form");
+  var button = document.getElementById("submit-btn");
+  var status = document.getElementById("status");
+
+  function showStatus(kind, message) {
+    status.className = "status " + kind;
+    status.textContent = message;
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    status.className = "status"; // hide previous message
+
+    var companyName = document.getElementById("company_name").value.trim();
+    if (!companyName) {
+      showStatus("error", "Please enter your company name.");
+      return;
+    }
+
+    var payload = {
+      company_name: companyName,
+      contact_name: document.getElementById("contact_name").value.trim(),
+      email: document.getElementById("email").value.trim() || null,
+      message: document.getElementById("message").value.trim(),
+      source_detail: "Website form"
+    };
+
+    button.disabled = true;
+    button.textContent = "Sending…";
+
+    fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": API_KEY
+      },
+      body: JSON.stringify(payload)
+    })
+      .then(function (response) {
+        return response.json().catch(function () { return {}; }).then(function (data) {
+          if (response.ok) {
+            showStatus("success", "Thanks — your message has been received. We'll be in touch shortly.");
+            form.reset();
+          } else if (response.status === 503) {
+            showStatus("error", "The lead system is not configured yet (no webhook key set on the server).");
+          } else if (response.status === 403) {
+            showStatus("error", "Submission rejected: the API key is invalid or missing.");
+          } else if (response.status === 422) {
+            showStatus("error", "Please check your details — the email address looks invalid.");
+          } else {
+            showStatus("error", "Something went wrong (" + response.status + "): " + (data.detail || "unknown error"));
+          }
+        });
+      })
+      .catch(function () {
+        showStatus("error", "Could not reach the server. Is the backend running at " + API_URL + "?");
+      })
+      .finally(function () {
+        button.disabled = false;
+        button.textContent = "Send message";
+      });
+  });
+</script>
