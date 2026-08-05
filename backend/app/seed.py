@@ -1,8 +1,9 @@
-"""Sample data seeding.
+"""Optional sample-data seeding utility.
 
-Everything created here is flagged `is_sample=True` and labelled in the UI so
-users never confuse demo content with real results. `reseed_samples()` is
-re-run after onboarding to tailor the sample workspace to the user's market.
+NOT used automatically — the app starts with a clean, empty workspace.
+Developers can call `reseed_samples()` manually (e.g. from a Python shell)
+to create a labelled sample workspace for testing. Everything created here is
+flagged `is_sample=True`.
 """
 
 import json
@@ -246,8 +247,3 @@ def reseed_samples(db: Session, *, industry: str = "", location: str = "", audie
 
     db.add(ActivityLog(entity_type="system", message="Sample workspace created. Everything labelled 'Sample' is demo data — replace it with your own as you go."))
     db.commit()
-
-
-def seed_if_empty(db: Session) -> None:
-    if db.query(Lead).count() == 0 and db.query(EmailTemplate).count() == 0:
-        reseed_samples(db)

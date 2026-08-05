@@ -25,3 +25,76 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-ink-300;
 }
+
+/* ── Onboarding cinematics ─────────────────────────────────────────────── */
+
+/* Slow-drifting aurora blobs behind the onboarding scenes. */
+@keyframes aurora-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(12vw, -8vh) scale(1.15); }
+  66% { transform: translate(-6vw, 10vh) scale(0.95); }
+}
+@keyframes aurora-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(-10vw, 6vh) scale(1.2); }
+  75% { transform: translate(8vw, -10vh) scale(0.9); }
+}
+@keyframes aurora-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1.05); }
+  50% { transform: translate(6vw, 8vh) scale(0.9); }
+}
+.aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.5;
+  pointer-events: none;
+  will-change: transform;
+}
+.aurora-1 { animation: aurora-drift-1 26s ease-in-out infinite; }
+.aurora-2 { animation: aurora-drift-2 32s ease-in-out infinite; }
+.aurora-3 { animation: aurora-drift-3 24s ease-in-out infinite; }
+
+/* Scene enter: rise + fade with a slight spring. */
+@keyframes scene-enter {
+  0% { opacity: 0; transform: translateY(26px) scale(0.985); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.scene-enter { animation: scene-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes scene-enter-slow {
+  0% { opacity: 0; transform: translateY(14px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.scene-enter-slow { animation: scene-enter-slow 0.7s ease-out both; }
+
+/* Build-step reveal in the workspace-assembly finale. */
+@keyframes build-step-in {
+  0% { opacity: 0; transform: translateX(-14px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+.build-step-in { animation: build-step-in 0.35s ease-out both; }
+
+/* Confetti burst on the final reveal. */
+@keyframes confetti-fall {
+  0% { opacity: 1; transform: translateY(-10vh) rotate(0deg); }
+  100% { opacity: 0; transform: translateY(70vh) rotate(720deg); }
+}
+.confetti-piece {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  animation: confetti-fall 2.6s ease-in forwards;
+  pointer-events: none;
+}
+
+/* Gentle pop for the recovery key + welcome headline. */
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.9); }
+  70% { transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.pop-in { animation: pop-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }

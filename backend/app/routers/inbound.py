@@ -12,6 +12,7 @@ from ..db import get_db
 from ..engine.automations import fire_trigger
 from ..models import ActivityLog, Lead, Setting
 from ..schemas import InboundLeadCreate
+from ..security import require_auth
 from ..serializers import lead_out
 
 router = APIRouter(prefix="/api/inbound", tags=["inbound"])
@@ -64,7 +65,7 @@ def inbound_webhook(
     return {"ok": True, "lead_id": lead.id}
 
 
-@router.get("/status")
+@router.get("/status", dependencies=[Depends(require_auth)])
 def inbound_status(db: Session = Depends(get_db)):
     settings = get_settings()
     return {
@@ -74,7 +75,7 @@ def inbound_status(db: Session = Depends(get_db)):
     }
 
 
-@router.get("/recent")
+@router.get("/recent", dependencies=[Depends(require_auth)])
 def recent_inbound(limit: int = 25, offset: int = 0, search: str = "", db: Session = Depends(get_db)):
     query = db.query(Lead).filter(Lead.source == "inbound")
     if search:

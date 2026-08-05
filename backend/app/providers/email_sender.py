@@ -1,9 +1,8 @@
 """Email sending providers.
 
 `SmtpEmailSender` works with any SMTP provider (AWS SES, Postmark, Mailgun,
-Google Workspace, …) using credentials from environment variables.
-`DemoEmailSender` records sends without contacting anything, so campaigns and
-automations can be explored safely.
+Google Workspace, …) using the credentials from Settings → Connections or
+environment variables.
 """
 
 import smtplib
@@ -14,7 +13,7 @@ from email.mime.text import MIMEText
 
 @dataclass
 class SendResult:
-    # simulated | sent | failed
+    # sent | failed
     status: str
     detail: str = ""
 
@@ -25,14 +24,6 @@ class EmailSender:
 
     def send(self, *, to_email: str, subject: str, html: str, text: str) -> SendResult:
         raise NotImplementedError
-
-
-class DemoEmailSender(EmailSender):
-    name = "Demo Sender (no emails leave the system)"
-    is_real = False
-
-    def send(self, *, to_email: str, subject: str, html: str, text: str) -> SendResult:
-        return SendResult("simulated", f"Demo mode: email to {to_email} recorded but not sent.")
 
 
 class SmtpEmailSender(EmailSender):

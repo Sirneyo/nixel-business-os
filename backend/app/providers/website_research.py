@@ -1,11 +1,9 @@
 """Website research providers.
 
 Given a discovered business, review its website to produce a short research
-summary and find contact details. The live researcher fetches real pages with
-httpx; the demo researcher fabricates consistent, clearly-plausible results.
+summary and find contact details by fetching real pages with httpx.
 """
 
-import random
 import re
 from dataclasses import dataclass, field
 
@@ -82,45 +80,4 @@ class LiveWebsiteResearcher(WebsiteResearcher):
             result.summary = f"Reviewed {len(result.pages_reviewed)} page(s). Site excerpt: {text_sample[:400]}"
         else:
             result.summary = f"Reviewed {len(result.pages_reviewed)} page(s); no readable description found."
-        return result
-
-
-# ── Demo researcher ─────────────────────────────────────────────────────────
-
-_FIRST = ["Sarah", "James", "Priya", "Daniel", "Amelia", "Marcus", "Elena", "Tom", "Grace", "Victor", "Nadia", "Owen"]
-_LAST = ["Whitfield", "Okafor", "Bennett", "Kaur", "Marsh", "Delgado", "Hughes", "Lindberg", "Carter", "Adeyemi"]
-_ROLES = ["Owner", "Managing Director", "Founder", "Operations Manager", "General Manager", "Director"]
-
-_SUMMARIES = [
-    "Reviewed homepage, about and contact pages. The site presents a small {industry} team with clear service pages and recent updates, suggesting an active business.",
-    "Reviewed 3 pages. The website is dated but functional; services match the search brief and a named owner appears on the about page.",
-    "Reviewed homepage and team page. Well-maintained {industry} site with case studies and a published contact address.",
-    "Reviewed 4 pages. Site emphasises local {industry} work; no pricing published, contact form plus a direct email listed.",
-]
-
-
-class DemoWebsiteResearcher(WebsiteResearcher):
-    name = "Demo Website Research"
-
-    def research(self, *, company_name: str, website: str, industry: str) -> ResearchResult:
-        rng = random.Random(company_name)
-        result = ResearchResult()
-
-        # A small share of demo sites are unreachable, so users see failures too.
-        if rng.random() < 0.12:
-            result.reachable = False
-            result.notes = "Website did not respond after 3 attempts."
-            return result
-
-        domain = re.sub(r"^https?://(www\.)?", "", website).rstrip("/") or "example.com"
-        result.pages_reviewed = [f"https://{domain}", f"https://{domain}/about", f"https://{domain}/contact"]
-        result.summary = rng.choice(_SUMMARIES).format(industry=industry or "local")
-
-        first, last = rng.choice(_FIRST), rng.choice(_LAST)
-        if rng.random() < 0.7:
-            result.contact_name = f"{first} {last}"
-            result.contact_role = rng.choice(_ROLES)
-            result.emails_found.append(f"{first.lower()}@{domain}")
-        if rng.random() < 0.8:
-            result.emails_found.append(f"{rng.choice(GENERIC_PREFIXES)}@{domain}")
         return result

@@ -20,3 +20,6 @@ frontend/dist/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Build artifacts
+*.tsbuildinfo

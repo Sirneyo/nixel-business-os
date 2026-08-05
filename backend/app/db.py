@@ -2,7 +2,7 @@
 
 SQLite by default; any SQLAlchemy URL works via DATABASE_URL. For production
 deployments switch to PostgreSQL and manage schema changes with a real
-migration tool (see docs/installation.md).
+migration tool.
 """
 
 from sqlalchemy import create_engine, inspect, text

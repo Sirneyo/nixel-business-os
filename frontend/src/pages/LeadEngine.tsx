@@ -18,7 +18,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { cancelRun, fetchRun, fetchRuns, startRun } from "../api/client";
+import { cancelRun, fetchRun, fetchRuns, fetchSettings, startRun } from "../api/client";
 import { Badge, Button, Card, ErrorNote, FormField, Input, PageContainer, PageHeader, SampleBadge, Textarea } from "../components/ui";
 import { QUALIFICATION_TONE, RUN_STATUS_TONE, formatDate, titleCase } from "../lib/format";
 import type { EngineRun, Lead, RunEvent } from "../types";
@@ -56,8 +56,15 @@ export default function LeadEngine() {
     criteria: "",
     leads_requested: 10,
   });
+  const [builtInSearch, setBuiltInSearch] = useState(false);
   const lastEventId = useRef(0);
   const feedRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchSettings()
+      .then((s) => setBuiltInSearch(!s.providers.lead_search.configured))
+      .catch(() => undefined);
+  }, []);
 
   const loadHistory = useCallback(() => {
     fetchRuns()
@@ -151,6 +158,19 @@ export default function LeadEngine() {
         subtitle="Describe your ideal customer, press start, and watch every stage work live: searching, discovering websites, researching, finding contacts, verifying emails and qualifying leads."
       />
       <ErrorNote message={error} />
+
+      {builtInSearch && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+          <Sparkles size={15} className="shrink-0 text-brand-600" />
+          <span>
+            <strong>You're on the built-in search (OpenStreetMap)</strong> — real businesses, no setup needed, but
+            coverage and websites can be limited.
+          </span>
+          <Link to="/settings" className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800">
+            Connect Google Places for deeper results →
+          </Link>
+        </div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-3">
         {/* ── Search brief ─────────────────────────────────────────────── */}

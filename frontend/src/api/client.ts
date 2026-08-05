@@ -21,11 +21,33 @@ import type {
 
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
 
+const TOKEN_KEY = "nixel_token";
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string | null): void {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
   const response = await fetch(`${API_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers ?? {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers ?? {}),
+    },
     ...options,
   });
+  if (response.status === 401 && !path.startsWith("/api/auth/")) {
+    // Session expired or signed out elsewhere — drop the token and let the
+    // app switch to the login screen.
+    setToken(null);
+    window.dispatchEvent(new Event("nixel:unauthorized"));
+  }
   if (!response.ok) {
     let detail = `${response.status} ${response.statusText}`;
     try {
@@ -147,7 +169,47 @@ export const deleteOpportunity = (id: number) => del<{ deleted: number }>(`/api/
 
 // ── Settings / onboarding ───────────────────────────────────────────────────
 export const fetchSettings = () => get<AppSettings>("/api/settings");
-export const updateSettings = (values: Record<string, string>) => put<{ ok: boolean }>("/api/settings", { values });
-export const fetchOnboardingStatus = () => get<{ completed: boolean }>("/api/settings/onboarding");
+export const updateSettings = (values: Record<string, string>, secrets: Record<string, string> = {}) =>
+  put<{ ok: boolean }>("/api/settings", { values, secrets });
 export const completeOnboarding = (payload: Record<string, unknown>) => post<{ ok: boolean }>("/api/settings/onboarding", payload);
-export const fetchHealth = () => get<{ ok: boolean; demo_mode: boolean; disclaimer: string }>("/api/health");
+export const fetchHealth = () => get<{ ok: boolean; disclaimer: string }>("/api/health");
+
+// ── Auth ────────────────────────────────────────────────────────────────────
+export interface AuthStatus {
+  account_exists: boolean;
+  onboarded: boolean;
+}
+
+export const fetchAuthStatus = () => get<AuthStatus>("/api/auth/status");
+
+export async function login(email: string, password: string): Promise<string> {
+  const result = await post<{ token: string; email: string }>("/api/auth/login", { email, password });
+  setToken(result.token);
+  return result.email;
+}
+
+export async function register(email: string, password: string): Promise<{ email: string; recovery_key: string }> {
+  const result = await post<{ token: string; email: string; recovery_key: string }>("/api/auth/register", { email, password });
+  setToken(result.token);
+  return { email: result.email, recovery_key: result.recovery_key };
+}
+
+export async function recoverAccount(email: string, recoveryKey: string, newPassword: string): Promise<{ email: string; recovery_key: string }> {
+  const result = await post<{ token: string; email: string; recovery_key: string }>("/api/auth/recover", {
+    email,
+    recovery_key: recoveryKey,
+    new_password: newPassword,
+  });
+  setToken(result.token);
+  return { email: result.email, recovery_key: result.recovery_key };
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await post<{ ok: boolean }>("/api/auth/logout");
+  } finally {
+    setToken(null);
+  }
+}
+
+export const fetchMe = () => get<{ email: string }>("/api/auth/me");

@@ -10,14 +10,13 @@ engine genuinely working. Runs are cancellable between leads.
 """
 
 import threading
-import time
 
 from sqlalchemy.orm import Session
 
-from ..config import get_settings
 from ..db import session_scope
 from ..models import ActivityLog, EngineRun, Lead, RunEvent
 from ..providers import get_email_verifier, get_lead_scorer, get_lead_search, get_website_researcher
+from ..providers.lead_search import OpenStreetMapSearch
 
 STAGES = [
     ("search", "Searching for businesses"),
@@ -38,9 +37,7 @@ def _emit(db: Session, run: EngineRun, stage: str, agent: str, message: str, lev
 
 
 def _pace() -> None:
-    """Small delay in demo mode so the live feed is watchable, not instant."""
-    if get_settings().demo_mode:
-        time.sleep(0.35)
+    """No artificial pacing — stages take as long as the real providers take."""
 
 
 def _cancelled(db: Session, run_id: int) -> bool:
@@ -89,6 +86,13 @@ def _run_pipeline(db: Session, run: EngineRun) -> None:
     db.commit()
     _emit(db, run, "search", "Lead Scout", f"Starting search: {run.business_type or run.industry or 'businesses'} in {run.location or 'any location'} (target: {run.leads_requested} leads).")
     _emit(db, run, "search", "Lead Scout", f"Using provider: {searcher.name}.")
+    if isinstance(searcher, OpenStreetMapSearch):
+        _emit(
+            db, run, "search", "Lead Scout",
+            "You're on the built-in OpenStreetMap search — results are real but coverage and websites can be limited. "
+            "Connect Google Places in Settings → Connections for deeper, richer results.",
+            "warning",
+        )
     _pace()
 
     results = searcher.search(

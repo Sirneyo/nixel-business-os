@@ -1,26 +1,26 @@
 # Nixel Business OS — Starter Edition
 
-A real, working business system that demonstrates connected AI agents working together across lead generation, research, verification, outreach, automation and pipeline management — in one place, on your own machine.
+A real, working business system: connected AI agents handling lead generation, research, email verification, outreach, automation and pipeline management — in one place, on your own machine.
 
-This is the **Starter Edition**: an open, customisable foundation you can download, run and adapt. It runs entirely in **Demo Mode with zero configuration** — search, verification, AI scoring and email sending are all simulated with clearly labelled sample data, so you can explore every module safely before connecting anything real. When you are ready, real providers plug in through environment variables: Anthropic (Claude) for AI lead scoring, Google Places for business search, built-in DNS/MX email verification, and any SMTP provider for sending.
+It **works the moment you install it**. Lead search runs on a free built-in engine (OpenStreetMap) with zero signup, website research and email verification are built in, and a rule-based scorer qualifies leads out of the box. When you're ready for more power, paste your keys into **Settings → Connections** inside the app — Google Places for deeper business search, Claude (Anthropic) for AI lead scoring, and any SMTP provider for real email sending. Each capability switches on instantly; no restarts, no config files required.
 
-Nixel offers professional installation, security hardening, integrations and advanced customisation for teams who want this running in production. The Starter Edition is yours to learn from and build on.
+Nixel offers professional installation, security hardening, integrations and advanced customisation for teams who want this running in production — [nixelai.com](https://nixelai.com).
 
 ## The 7 modules
 
 | Module | What it does |
 |---|---|
 | **Lead Generation Engine** | Enter a search brief and watch a run move through seven live, visible stages — Searching, Discovering, Researching, Contacts, Verifying, Assessing, Saving — with a real-time activity feed showing each agent working. |
-| **Verified Lead Workspace** | Every lead the engine finds (or that arrives inbound) lands here with its email verification status, research summary, relevance score and a written explanation of why it was qualified or rejected. Search, filter, edit, approve, reject, export to CSV, add to campaigns or send to the pipeline. |
-| **Inbound Lead Capture** | A webhook endpoint (`POST /api/inbound/lead`, protected by an `X-API-Key` header) that connects your website forms and external systems straight into the workspace, and can trigger automations the moment a lead arrives. |
-| **Campaign Engine** | Multi-step email sequences with per-campaign daily limits, send windows, send days and step delays. The background scheduler sends due emails automatically; in demo mode sends are simulated and engagement (opens/replies) is modelled so results feel real. |
+| **Verified Lead Workspace** | Every lead lands here with its email verification status, research summary, relevance score and a written explanation of why it qualified or was rejected. Search, filter, edit, approve, reject, export to CSV, add to campaigns or send to the pipeline. |
+| **Inbound Lead Capture** | A webhook endpoint (`POST /api/inbound/lead`, protected by an `X-API-Key` header) that connects your website forms straight into the workspace and can trigger automations the moment a lead arrives. A working example form is in [examples/inbound-form.html](examples/inbound-form.html). |
+| **Campaign Engine** | Multi-step email sequences with per-campaign daily limits, send windows, send days and step delays. The background scheduler sends due emails automatically once SMTP is connected. |
 | **Email Builder** | Block-based email templates (headings, text, buttons, dividers, footers) rendered to email-safe HTML, with `{{merge_fields}}` for personalisation, live preview and test sends. |
-| **Automation Engine** | Readable, linear automations: a trigger (lead qualified, lead approved, inbound lead, or manual) followed by steps — send email, add to campaign, wait, check for a reply, create a pipeline opportunity, add a note. Simulation mode logs everything without doing anything external. |
-| **Opportunity Pipeline** | A Kanban board from New Lead through Contacted, Replied, Qualified, Meeting Booked, Proposal Sent and Negotiation to Won/Lost, with deal values, notes and a full activity history per opportunity. |
+| **Automation Engine** | Readable, linear automations: a trigger (lead qualified, lead approved, inbound lead, or manual) followed by steps — send email, add to campaign, wait, check for a reply, create a pipeline opportunity, add a note. Simulation mode logs everything before you switch an automation live. |
+| **Opportunity Pipeline** | A Kanban board from New Lead through to Won/Lost, with deal values, notes and a full activity history per opportunity. |
 
-A founder dashboard ties it together with live KPIs (total leads, verified emails, replies, open opportunities, won deals) and a cross-module activity feed.
+A dashboard ties it together with live KPIs and a cross-module activity feed.
 
-## Quick start (under 5 minutes, no configuration)
+## Quick start (under 10 minutes)
 
 Prerequisites: **Python 3.11+** and **Node 18+**.
 
@@ -32,7 +32,7 @@ Prerequisites: **Python 3.11+** and **Node 18+**.
 cd backend
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\uvicorn app.main:app --reload
+.venv\Scripts\uvicorn app.main:app
 ```
 
 **macOS / Linux:**
@@ -41,10 +41,10 @@ python -m venv .venv
 cd backend
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn app.main:app --reload
+.venv/bin/uvicorn app.main:app
 ```
 
-The API is now running at http://localhost:8000. On first start it creates the SQLite database file `nixel_starter.db` automatically and seeds a clearly labelled sample workspace. Check it is alive: http://localhost:8000/api/health
+The API is now at http://localhost:8000 (health check: http://localhost:8000/api/health). The SQLite database file `backend/nixel_starter.db` is created automatically on first start.
 
 ### 2. Start the frontend
 
@@ -56,23 +56,38 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5173**. A short onboarding asks about your business and rebuilds the sample data around your own market. That's it — you are in Demo Mode, and everything works: run the engine, review leads, build emails, start campaigns, watch automations, move deals through the pipeline. Nothing leaves your machine.
+Open **http://localhost:5173**. Onboarding walks you through creating your account (email + password), saving your **recovery key**, and two quick questions about your business — then you're in. Run the engine, review leads, build emails, create campaigns and automations, move deals through the pipeline.
 
-When you want real providers, copy `backend/.env.example` to `backend/.env`, add your keys and set `DEMO_MODE=false`. See [docs/configuration.md](docs/configuration.md).
+## Accounts, passwords & recovery
 
-## Screenshots
+- The first (and only) account is created during onboarding. The password is stored as a salted PBKDF2 hash in the local database — never in plain text.
+- **Forgot the password?** Click *"Use your recovery key"* on the sign-in screen and enter the `NIXL-…` key shown at signup. You'll set a new password and receive a fresh recovery key.
+- **Lost both?** Whoever controls the installation can reset from the `backend/` folder: `.venv\Scripts\python -m app.reset_password` (prints a new password and recovery key).
 
-*Screenshots coming soon — the Live Engine view, the Verified Lead Workspace, the Email Builder and the Opportunity Pipeline will be shown here.*
+## Connecting real services
+
+Everything is configured inside the app at **Settings → Connections** (stored in the local database; saved keys are never displayed again):
+
+| Connection | Unlocks | Get it from |
+|---|---|---|
+| Google Places API key | Deeper lead search than the built-in OpenStreetMap engine | console.cloud.google.com (enable "Places API") |
+| Claude API key | AI lead scoring with written reasoning | console.anthropic.com |
+| SMTP credentials | Real email sending for campaigns, automations and tests | Your email provider (AWS SES, Postmark, Mailgun, SendGrid, Google Workspace, …) |
+
+Environment variables in `backend/.env` (see [backend/.env.example](backend/.env.example)) are supported as a fallback for server deployments — values saved in Settings take precedence.
 
 ## Documentation
 
-- [System overview & how information flows](docs/overview.md)
-- [Technical architecture](docs/architecture.md)
-- [Installation (local & production)](docs/installation.md)
-- [Configuration & providers](docs/configuration.md)
-- [Security checklist](docs/security-checklist.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Example: inbound lead capture form](docs/examples/inbound-form.html)
+The full user guide — installation, a tour of every screen with real screenshots, connections, deployment and troubleshooting — is the PDF in this folder: **Nixel-Business-OS-Guide.pdf**.
+
+## Deploying to a server (summary)
+
+1. Copy the folder to the server, repeat the install, and build the frontend (`npm run build` → serve `frontend/dist`).
+2. Run the backend as a service (systemd / NSSM) on `127.0.0.1:8000` and reverse-proxy `/api` to it (nginx or Caddy) with HTTPS.
+3. Set `PUBLIC_BASE_URL` and `CORS_ORIGINS` in `backend/.env` to your https address.
+4. Your whole workspace — account, keys, data — lives in the single file `backend/nixel_starter.db`. Copy it to move or back up (back it up regularly, with the backend stopped).
+
+Before exposing it to the internet: HTTPS on, firewall allowing only web traffic, the database file readable only by the service account, and a real look at your local privacy/anti-spam obligations before emailing real people.
 
 ## Disclaimer
 

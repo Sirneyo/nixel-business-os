@@ -27,6 +27,36 @@ class Setting(Base):
     value: Mapped[str] = mapped_column(Text, default="")
 
 
+# ── Account & sessions ──────────────────────────────────────────────────────
+
+
+class User(Base):
+    """The workspace owner. Passwords and recovery keys are stored as salted
+    PBKDF2 hashes — never in plain text."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(500))
+    # Hash of the one-time recovery key shown at signup (used when the
+    # password is forgotten and no email sending is configured).
+    recovery_hash: Mapped[str] = mapped_column(String(500), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class AuthSession(Base):
+    """A login session; the token is sent as a Bearer header by the frontend."""
+
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+
+
 # ── Leads ───────────────────────────────────────────────────────────────────
 
 

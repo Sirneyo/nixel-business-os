@@ -113,7 +113,10 @@ class OpportunityUpdate(BaseModel):
 
 
 class SettingsUpdate(BaseModel):
-    values: dict[str, str]
+    values: dict[str, str] = {}
+    # Provider credentials entered in Settings → Connections; only keys present
+    # in the payload are written, so untouched credentials stay as they are.
+    secrets: dict[str, str] = {}
 
 
 class OnboardingComplete(BaseModel):
@@ -122,5 +125,3 @@ class OnboardingComplete(BaseModel):
     target_audience: str = ""
     target_location: str = ""
     primary_offer: str = ""
-    email_provider: str = ""
-    ai_provider: str = ""

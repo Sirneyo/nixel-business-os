@@ -1,11 +1,9 @@
 """Campaign send processing (invoked by the background scheduler)."""
 
-import random
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from ..config import get_settings
 from ..models import Campaign, CampaignLead, EmailSend, utcnow
 from .sending import send_templated_email
 
@@ -62,12 +60,6 @@ def process_campaigns(db: Session) -> int:
                 step_position=step.position,
                 sender_name=campaign.sender_name,
             )
-            # In demo mode, simulate engagement so results feel real.
-            if send.status == "simulated" and get_settings().demo_mode:
-                rng = random.Random(send.id)
-                send.opened = rng.random() < 0.45
-                send.replied = send.opened and rng.random() < 0.18
-
             if send.replied:
                 member.status = "replied"
                 member.next_send_at = None

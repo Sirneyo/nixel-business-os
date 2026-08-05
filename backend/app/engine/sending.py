@@ -35,7 +35,7 @@ def send_templated_email(
     else:
         result = sender.send(to_email=lead.email, subject=subject, html=html, text=text)
         send.status = result.status
-        send.error_message = "" if result.status in ("sent", "simulated") else result.detail
+        send.error_message = "" if result.status == "sent" else result.detail
 
     db.add(send)
     db.add(

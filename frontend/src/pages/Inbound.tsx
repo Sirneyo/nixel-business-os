@@ -81,7 +81,7 @@ export default function Inbound() {
           </div>
           <p className="mb-3 text-sm text-ink-500">
             POST JSON to the endpoint below with your secret key in the <code className="rounded bg-ink-100 px-1 text-xs">X-API-Key</code> header.
-            A full working example form is in <code className="rounded bg-ink-100 px-1 text-xs">docs/examples/inbound-form.html</code>.
+            A full working example form is in <code className="rounded bg-ink-100 px-1 text-xs">examples/inbound-form.html</code>.
           </p>
           <pre className="overflow-x-auto rounded-xl bg-ink-900 p-4 text-xs leading-relaxed text-ink-100">{snippet}</pre>
         </Card>

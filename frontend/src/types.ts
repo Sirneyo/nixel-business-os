@@ -241,13 +241,13 @@ export interface ProviderStatus {
 export interface AppSettings {
   values: Record<string, string>;
   providers: {
-    demo_mode: boolean;
     ai: ProviderStatus;
     lead_search: ProviderStatus;
     email_verify: ProviderStatus;
     email_sender: ProviderStatus;
     inbound_webhook: { configured: boolean };
   };
+  secrets_configured: Record<string, boolean>;
   public_base_url: string;
 }
 

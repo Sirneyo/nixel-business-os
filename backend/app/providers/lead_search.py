@@ -1,11 +1,16 @@
 """Business discovery providers.
 
-`DemoLeadSearch` fabricates plausible businesses from the search brief so the
-engine can be explored with zero configuration. `GooglePlacesSearch` uses the
-Google Places Text Search API when a key is configured.
+`OpenStreetMapSearch` is the built-in, no-key search: it finds real businesses
+through the free OpenStreetMap Nominatim API, so the Lead Engine works the
+moment the app is installed. Coverage and contact data are community-maintained
+and therefore thinner than Google's.
+
+`GooglePlacesSearch` is the recommended upgrade — it finds richer results with
+the Google Places Text Search API using the key from Settings → Connections
+(or the environment).
 """
 
-import random
+import time
 from dataclasses import dataclass, field
 
 import httpx
@@ -27,59 +32,173 @@ class LeadSearchProvider:
         raise NotImplementedError
 
 
-# ── Demo provider ───────────────────────────────────────────────────────────
+# ── OpenStreetMap (built-in, no key required) ───────────────────────────────
 
-_PREFIXES = [
-    "Summit", "Harbor", "Beacon", "Crestwood", "Northgate", "Silverline", "Oakfield",
-    "Brightway", "Keystone", "Bluepeak", "Redwood", "Lakeside", "Ironbridge", "Fairview",
-    "Stonepath", "Meridian", "Clearwater", "Highland", "Westbrook", "Goldcrest", "Arbor",
-    "Pinnacle", "Cedar", "Vertex", "Horizon", "Anchor", "Trailhead", "Copperfield",
-]
 
-_SUFFIX_BY_TYPE = {
-    "agency": ["Agency", "Partners", "Group", "Studio", "Collective"],
-    "consultancy": ["Consulting", "Advisory", "Associates", "Partners"],
-    "retail": ["Stores", "Retail", "Trading Co", "Supply"],
-    "restaurant": ["Kitchen", "Bistro", "Eatery", "Table"],
-    "default": ["Ltd", "Group", "Co", "Solutions", "Services", "Partners"],
+# Words that carry no signal when matching OSM business names/categories.
+_OSM_STOPWORDS = {
+    "agency", "agencies", "company", "companies", "business", "businesses",
+    "firm", "firms", "service", "services", "local", "small", "the", "and",
+    "in", "of", "ltd", "limited", "shop", "store", "provider", "providers",
 }
 
-_DESCRIPTION_TEMPLATES = [
-    "{name} is a {industry} business serving clients in {location}. They focus on {kw} and have an established local presence.",
-    "A growing {industry} company based in {location}. {name} works with small and mid-sized clients on {kw}.",
-    "{name} provides {kw} services for the {industry} sector, operating primarily around {location}.",
-    "Family-run {industry} firm in {location}. Recent activity suggests {name} is expanding its {kw} offering.",
-    "{name} is an independent {industry} provider in {location} with a small in-house team and a focus on {kw}.",
-]
 
+class OpenStreetMapSearch(LeadSearchProvider):
+    name = "Built-in search (OpenStreetMap)"
 
-class DemoLeadSearch(LeadSearchProvider):
-    name = "Demo Search"
+    # OSM usage policies: identify the application and keep request rates low.
+    # The engine makes at most three requests per run.
+    USER_AGENT = "NixelBusinessOS-Starter/1.0 (https://nixelai.com/contact)"
 
     def search(self, *, industry: str, keywords: str, location: str, business_type: str, limit: int) -> list[BusinessResult]:
-        rng = random.Random(f"{industry}|{keywords}|{location}|{business_type}")
-        suffixes = _SUFFIX_BY_TYPE.get((business_type or "").strip().lower(), _SUFFIX_BY_TYPE["default"])
-        industry_label = (industry or "local").strip() or "local"
-        kw = (keywords.split(",")[0].strip() if keywords else industry_label) or "their core services"
-        loc = (location or "their region").strip() or "their region"
+        cap = min(max(limit + 10, 20), 40)
+        what = (business_type or industry or keywords or "business").strip()
 
-        prefixes = rng.sample(_PREFIXES, k=min(len(_PREFIXES), max(limit + 4, 8)))
-        results: list[BusinessResult] = []
-        for prefix in prefixes[: limit + 4]:
-            suffix = rng.choice(suffixes)
-            name = f"{prefix} {industry_label.title()} {suffix}".replace("  ", " ")
-            slug = f"{prefix}{suffix}".lower().replace(" ", "")
-            desc = rng.choice(_DESCRIPTION_TEMPLATES).format(name=name, industry=industry_label, location=loc, kw=kw)
-            results.append(
-                BusinessResult(
-                    company_name=name,
-                    website=f"https://www.{slug}.example.com",
-                    location=loc,
-                    description=desc,
-                    extra={"demo": True},
-                )
-            )
+        # Pass 1 — Nominatim free text. Works well for mapped categories
+        # ("dentist in Leeds", "restaurant in Soho").
+        results = self._nominatim(f"{what} in {location}".strip() if location else what, cap, location)
+        if len(results) >= 3:
+            return results
+
+        # Pass 2 — Overpass area search. Catches businesses whose name or
+        # category matches the brief even when Nominatim's free text fails
+        # ("marketing agency", "accountant").
+        try:
+            deeper = self._overpass(what=f"{industry} {keywords} {business_type}", location=location, cap=cap)
+        except httpx.HTTPError:
+            deeper = []
+        known = {r.company_name.lower() for r in results}
+        results.extend(r for r in deeper if r.company_name.lower() not in known)
         return results
+
+    # ── Nominatim ────────────────────────────────────────────────────────
+
+    def _nominatim(self, query: str, cap: int, fallback_location: str) -> list[BusinessResult]:
+        response = httpx.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={
+                "q": query,
+                "format": "jsonv2",
+                "limit": cap,
+                "extratags": 1,
+                "addressdetails": 1,
+                "namedetails": 1,
+            },
+            headers={"User-Agent": self.USER_AGENT},
+            timeout=25,
+        )
+        response.raise_for_status()
+
+        results: list[BusinessResult] = []
+        seen: set[str] = set()
+        for item in response.json():
+            names = item.get("namedetails") or {}
+            name = (names.get("name") or item.get("name") or "").strip()
+            if not name or name.lower() in seen:
+                continue
+            seen.add(name.lower())
+
+            kind = (item.get("type") or "").replace("_", " ")
+            category = (item.get("category") or "").replace("_", " ")
+            label = kind if kind not in ("", "yes") else category
+            results.append(self._result(name, item.get("extratags") or {}, item.get("address") or {}, label, fallback_location))
+        return results
+
+    # ── Overpass ─────────────────────────────────────────────────────────
+
+    def _overpass(self, *, what: str, location: str, cap: int) -> list[BusinessResult]:
+        area_id = self._area_id(location)
+        if area_id is None:
+            return []
+
+        terms = [w for w in what.lower().split() if len(w) > 2 and w not in _OSM_STOPWORDS]
+        term = terms[0] if terms else (what.split()[0] if what.split() else "business")
+
+        # Businesses whose *name* or *category tag* mentions the term, within
+        # the geocoded area. nwr = nodes + ways + relations.
+        query = f"""
+        [out:json][timeout:25];
+        area({area_id})->.a;
+        (
+          nwr["name"~"{term}",i]["office"](area.a);
+          nwr["name"~"{term}",i]["shop"](area.a);
+          nwr["name"~"{term}",i]["amenity"](area.a);
+          nwr["name"~"{term}",i]["craft"](area.a);
+          nwr["office"~"{term}",i](area.a);
+          nwr["shop"~"{term}",i](area.a);
+          nwr["amenity"~"{term}",i](area.a);
+          nwr["craft"~"{term}",i](area.a);
+        );
+        out tags {cap * 2};
+        """
+        # Public Overpass servers rate-limit aggressively; try each mirror in
+        # turn and give the first one a moment to free a slot.
+        response = None
+        for attempt, url in enumerate([
+            "https://overpass-api.de/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter",
+        ]):
+            try:
+                response = httpx.post(url, data={"data": query}, headers={"User-Agent": self.USER_AGENT}, timeout=30)
+                response.raise_for_status()
+                break
+            except httpx.HTTPError:
+                response = None
+                if attempt == 0:
+                    time.sleep(2)
+        if response is None:
+            return []
+
+        results: list[BusinessResult] = []
+        seen: set[str] = set()
+        for element in response.json().get("elements", []):
+            tags = element.get("tags") or {}
+            name = (tags.get("name") or "").strip()
+            if not name or name.lower() in seen:
+                continue
+            seen.add(name.lower())
+
+            label = (tags.get("office") or tags.get("shop") or tags.get("amenity") or tags.get("craft") or "business").replace("_", " ")
+            address = {"city": tags.get("addr:city", ""), "country": tags.get("addr:country", "")}
+            results.append(self._result(name, tags, address, label, location))
+            if len(results) >= cap:
+                break
+        return results
+
+    def _area_id(self, location: str) -> int | None:
+        """Geocode the location to an Overpass area id."""
+        if not location.strip():
+            return None
+        response = httpx.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": location, "format": "jsonv2", "limit": 1},
+            headers={"User-Agent": self.USER_AGENT},
+            timeout=20,
+        )
+        response.raise_for_status()
+        hits = response.json()
+        if not hits:
+            return None
+        osm_type, osm_id = hits[0].get("osm_type"), hits[0].get("osm_id")
+        if osm_type == "relation":
+            return 3_600_000_000 + int(osm_id)
+        if osm_type == "way":
+            return 2_400_000_000 + int(osm_id)
+        return None
+
+    def _result(self, name: str, tags: dict, address: dict, label: str, fallback_location: str) -> BusinessResult:
+        website = (tags.get("website") or tags.get("contact:website") or tags.get("url") or "").strip()
+        town = address.get("city") or address.get("town") or address.get("village") or address.get("suburb") or ""
+        country = address.get("country") or ""
+        place = ", ".join(p for p in (town, country) if p) or (fallback_location or "")
+        description = f"{name} is listed on OpenStreetMap as a {label}".rstrip() + (f" in {place}." if place else ".")
+        return BusinessResult(
+            company_name=name,
+            website=website,
+            location=place,
+            description=description,
+            extra={"engine": "openstreetmap"},
+        )
 
 
 # ── Google Places ───────────────────────────────────────────────────────────

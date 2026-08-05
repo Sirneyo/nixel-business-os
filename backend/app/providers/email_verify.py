@@ -1,11 +1,9 @@
 """Email verification providers.
 
 `BuiltinEmailVerifier` performs real syntax, disposable-domain and DNS/MX
-checks with no external service. `DemoEmailVerifier` simulates results so the
-pipeline can be explored offline.
+checks with no external service.
 """
 
-import random
 import re
 from dataclasses import dataclass
 
@@ -70,24 +68,3 @@ class BuiltinEmailVerifier(EmailVerifier):
         if local in ROLE_PREFIXES:
             return VerifyResult("risky", f"Mail server found, but {local}@ is a role address — expect lower reply rates.")
         return VerifyResult("valid", f"Syntax OK and mail server (MX) confirmed for {domain}.")
-
-
-class DemoEmailVerifier(EmailVerifier):
-    name = "Demo Verifier"
-
-    def verify(self, email: str) -> VerifyResult:
-        pre = _syntax_and_disposable(email)
-        if pre:
-            return pre
-        email = email.strip().lower()
-        local = email.split("@", 1)[0]
-        rng = random.Random(email)
-
-        if local in ROLE_PREFIXES:
-            return VerifyResult("risky", f"Simulated check: {local}@ is a role address — deliverable but lower quality.")
-        roll = rng.random()
-        if roll < 0.72:
-            return VerifyResult("valid", "Simulated check: mailbox accepted and mail server confirmed.")
-        if roll < 0.88:
-            return VerifyResult("risky", "Simulated check: catch-all domain — mailbox could not be individually confirmed.")
-        return VerifyResult("invalid", "Simulated check: mailbox rejected by the mail server.")
